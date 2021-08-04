@@ -1,2 +1,2 @@
 # House-Sales-in-King-County-USA
-Various Statistical Analysis based on  house sales in King County,USA data
+House Price Prediction with Multiple Linear Regression based on King County , USA Data using R
