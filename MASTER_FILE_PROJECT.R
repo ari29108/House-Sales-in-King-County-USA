@@ -17,7 +17,6 @@ library(magrittr)
 #Importing the data and properly naming things
 Data_org = kc_house_data_original
 Data_House = kc_house_data_to_be_used
-X = kc_house_data_original
 
 # Knowing the names of the variables
 vec_names = names(Data_House)
