@@ -26,16 +26,32 @@ vec_names
 #checking missing observations
 sum(is.na(Data_House))
 
+#Outlier Treatment
+mod <- lm(price ~ ., data=Data_House)
+cooksd <- cooks.distance(mod)
+plot(cooksd, pch="*", cex=2, main="Influential Obs by Cooks distance")  # plot cook's distance
+abline(h = 4*mean(cooksd, na.rm=T), col="red")  # add cutoff line
+text(x=1:length(cooksd)+1, y=cooksd, labels=ifelse(cooksd>4*mean(cooksd, na.rm=T),names(cooksd),""), col="red")  # add labels
+price[3915]
+ind_outlier = (cooksd>4*mean(cooksd, na.rm=T))
+ind_out = which(ind_outlier == TRUE)
+head(ind_out)
+length(ind_out)
+Data_House_1 = Data_House[-ind_out,]
+dim(Data_House_1)
+plot(Data_House_1$sqft_living,Data_House_1$price,col = rgb(0.1,0.1,0.2,alpha = 0.1))
+
+
 # overview through summary function
-data_summary = summary(Data_House)
+data_summary = summary(Data_House_1)
 data_summary
-str(Data_House)
+str(Data_House_1)
 
 # dimension of the dataset
-dim(Data_House)
+dim(Data_House_1)
 
 #attaching the dataset
-attach(Data_House)
+attach(Data_House_1)
 
 #histogram and barplots
 t_bathrooms = table(bathrooms)
@@ -75,27 +91,20 @@ boxplot(price~ind_renov)
 hist(yr_renovated[ind_renov == 1])
 
 # Showing interaction b/w bathroom and bedrooms
-data_subset = Data_House[,c(1,2,3)]
-data_subset$bathrooms = round(data_subset$bathrooms)
-head(data_subset)
-data_subset$bedrooms = as.factor(data_subset$bedrooms)
-data_subset$bathrooms = as.factor(data_subset$bathrooms)
-ggboxplot(data_subset, x = "bedrooms", y = "price", color = "bathrooms")
+Data_House_Sub = Data_House[,c(1,2,3)]
+Data_House_Sub$bathrooms = round(Data_House_Sub$bathrooms)
+head(Data_House_Sub)
+Data_House_Sub$bedrooms = as.factor(Data_House_Sub$bedrooms)
+Data_House_Sub$bathrooms = as.factor(Data_House_Sub$bathrooms)
+ggboxplot(Data_House_Sub, x = "bedrooms", y = "price", color = "bathrooms")
 
 #Some plots for continuous valued variables
 hist(price)
 hist(sqft_living)
 plot(sqft_living,price)
-detach(Data_House)
 
 # Confirmatory Data Analysis
 
-# Selecting a subset of the original data
-c=sample(1:nrow(X),250,replace=F)
-Y=X[c,] #---The sample observations
-which(Y$price == sort(Y$sqft,decreasing = T)[2])
-Y[233,] = Y[235,]
-attach(Y)
 renovation_indicator=as.integer(yr_renovated>0)
 range(sqft_basement)
 range(price)
@@ -109,7 +118,7 @@ summary(lr)
 
 #(comment)----significant effect--
 #---kernal regression--
-plot(sqft_basement,price,xlab="Area of basement",main="Fitting kernel regression")#Scatter plot
+plot(sqft_basement,price,xlab="Area of basement",main="Fitting kernel regression",col = rgb(0,0.3,0.2,alpha = 0.1))#Scatter plot
 #Gaussian Kernel
 lines(ksmooth(sqft_basement,price,kernel="normal",bandwidth=300,n.points=length(sqft_living),range(sqft_basement)),col="blue")##---Fitting Normal Kernel regression
 #Box Kernel
@@ -118,20 +127,21 @@ lines(ksmooth(sqft_basement,price,kernel="box",
 legend("topright",legend=c("Normal","Box"),lty=1:1,col=c("blue","red"))
 
 #Scatter plot
-plot(sqft_basement,price,xlab="Area of basement",main="Fitting smoothing spline")
+plot(sqft_basement,price,xlab="Area of basement",main="Fitting smoothing spline",col = rgb(0,0.3,0.2,alpha = 0.1))
 lines(smooth.spline(sqft_basement,price))#---fitting smoothing spline---
 #----choose the degree the of polynomial by comparing measure of optimism viz AIC,BIC or CV---
 cv.error.10 = numeric(10);a=numeric(10);b=numeric(10)
-for(i in 1:5)
+for(i in 1:10)
 {
   a[i]=AIC(lm(price~poly(sqft_basement,i,raw=T)))
   b[i]=BIC(lm(price~poly(sqft_basement,i,raw=T)))
-  glm.fit=glm(price~poly(sqft_basement,i,raw=T) ,data=Y)
-  cv.error.10[i] = cv.glm(Y ,glm.fit,K = 10)$delta[1]
+  glm.fit=glm(price~poly(sqft_basement,i,raw=T) ,data = Data_House)
+  cv.error.10[i] = cv.glm(Data_House ,glm.fit,K = 10)$delta[1]
 }
 plot(cv.error.10,type="l")#----plotting the AIC to have it's minimum value
 plot(a,type="l")#----plotting the AIC to have it's minimum value
 plot(b,type="l")#----plotting the BIC to have it's minimum value
+which(a == min(a))
 #----Polynomial of degree 1  or simple regression is appropriate--- 
 x=sqft_basement
 y=price
@@ -144,7 +154,7 @@ summary(lr)
 #(comment)----significant effect--
 
 #---kernal regression--
-plot(sqft_above,price,xlab="Area of above",main="Fitting Kernel regression")
+plot(sqft_above,price,xlab="Area of above",main="Fitting Kernel regression",col = rgb(0,0.3,0.2,alpha = 0.1))
 lines(ksmooth(sqft_above,price,kernel="normal"
               ,bandwidth=300,n.points=length(sqft_above),range(sqft_above)),col="blue")##---Fitting Normal Kernel regression
 lines(ksmooth(sqft_above,price,kernel="box",bandwidth=300,
@@ -153,12 +163,15 @@ legend("topright",legend=c("Normal","Box"),lty=1:1,col=c("blue","red"))
 plot(sqft_basement,price,xlab="Area of above",main="Fitting smoothing spline")
 lines(smooth.spline(sqft_basement,price))#---fitting smoothing spline---
 #----choose the degree the of polynomial by comparing measure of optimism viz AIC,BIC or CV---
-a=numeric(10);b=numeric(10)
+a=numeric(10);b=numeric(10);cv.error.10=numeric(10)
 for(i in 1:10)
 {
   a[i]=AIC(lm(price~poly(sqft_above,i,raw=T)))
   b[i]=BIC(lm(price~poly(sqft_above,i,raw=T)))
+  glm.fit=glm(price~poly(sqft_above,i,raw=T) ,data = Data_House)
+  cv.error.10[i] = cv.glm(Data_House ,glm.fit,K = 10)$delta[1]
 }
+plot(cv.error.10,type="l")#----plotting the AIC to have it's minimum value
 plot(a,type="l")#----plotting the AIC to have it's minimum value
 plot(b,type="l")#----plotting the BIC to have it's minimum value
 x=sqft_above
@@ -178,25 +191,38 @@ summary(aov(price~as.factor(renovation_indicator)))#--No significant effect
 summary(aov(price~as.factor(bedroom_per_bathroom)))#--significant effect
 
 # cross validation 
-ind = sample(nrow(Data_House),size = 500)
-head(ind)
-data_subset = Data_House[ind,]
+
+#5-fold CV
+
 cv.error.5 = rep(0,5)
 for(i in 1:5)
 {
-  glm.fit=glm(price~poly(sqft_living,i) ,data=data_subset)
-  cv.error.5[i] = cv.glm(data_subset ,glm.fit,K = 10)$delta[1]
+  glm.fit=glm(price~poly(sqft_living,i) ,data=Data_House_1)
+  cv.error.5[i] = cv.glm(Data_House_1 ,glm.fit,K = 10)$delta[1]
 }
 cv.error.5
 plot(cv.error.5,type = "l")
-which(cv.error.5 == min(cv.error.5)) 
+which.min(cv.error.5)
+
+#10-fold CV
+
+cv.error.10 = rep(0,10)
+for(i in 1:10)
+{
+  glm.fit=glm(price~poly(sqft_living,i) ,data=Data_House_1)
+  cv.error.10[i] = cv.glm(Data_House_1 ,glm.fit,K = 10)$delta[1]
+}
+cv.error.10
+plot(cv.error.10[-10],type = "l")
+which.min(cv.error.10) 
+
 
 # Best subset selection
 
-names(data_subset)
-regfit.full = regsubsets(price~.,data_subset[,-4])
-regfit.full$
-  reg_summary = summary(regfit.full)
+names(Data_House_1)
+regfit.full = regsubsets(price~.,data = Data_House_1[,-4],nvmax = 12)
+reg_summary = summary(regfit.full)
+reg_summary
 names(reg_summary)
 reg_summary$rsq
 reg_summary$rss
@@ -209,11 +235,25 @@ plot(reg_summary$rss,type = "l")
 plot(reg_summary$adjr2,type = "l")
 plot(reg_summary$cp,type = "l")
 plot(reg_summary$bic,type = "l")
+which.min(reg_summary$bic)
+
+# Forward selection
+
+regfit.fwd = regsubsets(price~.,data = Data_House_1[,-4],method = "forward",nvmax = 12)
+reg_summary_fwd = summary(regfit.fwd)
+reg_summary_fwd
+
+# Forward selection
+
+regfit.bwd = regsubsets(price~.,data = Data_House_1[,-4],method = "backward",nvmax = 12)
+reg_summary_bwd = summary(regfit.fwd)
+reg_summary_bwd
+
 
 # Ridge and Lasso
 
-x=model.matrix(price~.,data_subset)[,-1]
-y=data_subset$price
+x=model.matrix(price~.,Data_House_1)[,-1]
+y=Data_House_1$price
 grid=10^seq(10,-2, length =10)
 ridge.mod=glmnet(x,y,alpha=0,lambda=grid)
 dim(coef(ridge.mod))
@@ -250,29 +290,44 @@ lasso.coef[lasso.coef!=0]
 #Splines
 
 #Basic Spline
-sqft_lims=range(data_subset$sqft_living)
+sqft_lims=range(Data_House_1$sqft_living)
 sqft.grid=seq(from=sqft_lims [1],to=sqft_lims [2])
-fit=lm(price~bs(sqft_living ,df = 15),data=data_subset)
+fit=lm(price~bs(sqft_living ,df = 15),data=Data_House_1)
 pred=predict(fit,newdata=list(sqft_living=sqft.grid),se=T)
-plot(data_subset$sqft_living,data_subset$price,col="gray")
+plot(Data_House_1$sqft_living,Data_House_1$price,col="gray")
 lines(sqft.grid,pred$fit ,lwd=2)
 lines(sqft.grid,pred$fit +2*pred$se ,lty="dashed")
 lines(sqft.grid,pred$fit -2*pred$se ,lty="dashed")
 
 #Natural Spline
 
-fit2=lm(price~ns(sqft_living,df=4),data=data_subset)
+fit2=lm(price~ns(sqft_living,df=4),data=Data_House_1)
 pred2=predict(fit2 ,newdata=list(sqft_living=sqft.grid),se=T)
 lines(sqft.grid, pred2$fit ,col="red",lwd=2)
 
 #Smoothing Spline
 
-plot(data_subset$sqft_living,data_subset$price,xlim=sqft_lims ,cex=.5,col="darkgrey ")
+plot(Data_House_1$sqft_living,Data_House_1$price,xlim=sqft_lims ,cex=.5,col="darkgrey")
 title("Smoothing Spline")
-fit=smooth.spline(data_subset$sqft_living,data_subset$price,df=16)
-fit2=smooth.spline(data_subset$sqft_living,data_subset$price,cv=TRUE)
+fit=smooth.spline(Data_House_1$sqft_living,Data_House_1$price,df=16)
+fit2=smooth.spline(Data_House_1$sqft_living,Data_House_1$price,cv=TRUE)
 fit2$df
 lines(fit ,col="red",lwd=2)
 lines(fit2,col="blue",lwd=2)
 legend("topright",legend=c("16 DF","6.8 DF"),
        col=c("red","blue"),lty=1,lwd=2,cex=.8)
+
+#Bootstrap estimate of the regression coefficients
+boot.fn <- function(data, index)
+{
+  coef(lm(price ~., data = Data_House_1, subset = index))
+}
+boot.fn(Data_House_1, 1:392)
+boot(Data_House_1,boot.fn,10^3)
+
+boot.fn.1 <- function(data, index)
+{
+  coef(lm(price ~ sqft_living, data = Data_House_1, subset = index))
+}
+boot.fn.1(Data_House_1, 1:392)
+boot(Data_House_1,boot.fn.1,10^3)
